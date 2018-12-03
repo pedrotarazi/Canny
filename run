@@ -1,0 +1,103 @@
+#!/bin/bash
+echo
+
+echo -e "\e[1m* BORRANDO RESULTADOS ANTERIORES\e[0m"
+
+
+echo -e "\e[32mrm ./bin/*\e[39m"
+rm ./bin/*
+echo -e "\e[32mrm ./out/*\e[39m"
+rm ./out/*
+
+
+echo
+echo
+
+librerias="-lm -O3 -pg"
+librerias="-lm"
+librerias="-lm -O3"
+
+
+echo -e "\e[1m* COMPILACION\e[0m"
+
+echo -e "___compilando serial...  \e[32m gcc -fopenmp -o ./bin/canny-serial ./src/canny-serial.c $librerias\e[39m"
+gcc -fopenmp -o ./bin/canny-serial ./src/canny-serial.c $librerias
+
+echo -e "___compilando openmp...  \e[32m gcc -fopenmp -o ./bin/canny-openmp ./src/canny-openmp.c $librerias\e[39m"
+gcc -fopenmp -o ./bin/canny-openmp ./src/canny-openmp.c $librerias
+
+echo -e "___compilando mpi...     \e[32m mpicc -fopenmp -o ./bin/canny-mpi ./src/canny-mpi.c $librerias\e[39m"
+# mpicc -fopenmp -o ./bin/canny-mpi ./src/canny-mpi.c $librerias
+mpicc -fopenmp -o ./bin/canny-mpi ./src/canny-mpi.c $librerias
+
+echo -e "___compilando cuda...    \e[32m nvcc -Xcompiler $librerias -o ./bin/canny-cuda $archivoCUDA\e[39m"
+nvcc -Xcompiler $librerias -o ./bin/canny-cuda ./src/canny-cuda.cu
+
+imagen="luna5000"       # 5000x5000         25.000.000        32
+imagen="piedra_cubica"  # 11200x6300        70.560.000        16
+imagen="caratula"       # 13317x7000        93.219.000        16
+imagen="textura"        # 1600x1000         1.600.000         32
+imagen="luna10000"      # 10000x10000       100.000.000       16
+imagen="top_marte"      # 15400x6940        106.876.000       16                  //ulimit -s 9999
+imagen="compu"          # 5977x3609         21.570.993        32
+
+tareas=32
+tareas=16
+
+parametros="10 0.4 0.6"
+parametros="5 0.4 0.6"
+parametros="1 0.2 0.8"
+parametros="10 0.2 0.8"
+parametros="1 0.4 0.6"
+parametros="10 0.2 0.8"
+parametros="5 0.2 0.8"
+parametros="2 0.33 0.66"
+
+echo
+echo -e "\e[1m* EJECUCION\e[0m"
+
+# serial
+echo
+echo -e "\e[32m./bin/canny-serial ./pgm/$imagen.pgm $parametros\e[39m"
+./bin/canny-serial ./pgm/$imagen.pgm $parametros
+echo
+echo "waiting..."
+sleep 5
+
+# openmp
+echo
+echo -e "\e[32m./bin/canny-openmp ./pgm/$imagen.pgm $parametros $tareas\e[39m"
+./bin/canny-openmp ./pgm/$imagen.pgm $parametros $tareas
+echo
+echo "waiting..."
+sleep 5
+
+# mpi
+echo
+echo -e "\e[32mmpirun -np $tareas ./bin/canny-mpi ./pgm/$imagen.pgm $parametros\e[39m"
+mpirun -np $tareas ./bin/canny-mpi ./pgm/$imagen.pgm $parametros
+# mpirun -np $tareas -host franky,rocky ./bin/canny-mpi ./pgm/$imagen.pgm $parametros
+echo
+echo "waiting..."
+sleep 5
+
+# cuda
+echo
+echo -e "\e[32m./bin/canny-cuda ./pgm/$imagen.pgm $parametros\e[39m"
+./bin/canny-cuda ./pgm/$imagen.pgm $parametros
+
+echo
+echo -e "\e[1m* COMPARACION POR CHECKSUM\e[0m"
+md5sum ./out/imagen-serial.pgm
+md5sum ./out/imagen-openmp.pgm
+md5sum ./out/imagen-mpi.pgm
+md5sum ./out/imagen-cuda.pgm
+
+echo
+echo -e "\e[1m* COMPARACION POR DIFF\e[0m"
+diff -sq ./out/imagen-serial.pgm ./out/imagen-openmp.pgm
+diff -sq ./out/imagen-serial.pgm ./out/imagen-mpi.pgm
+diff -sq ./out/imagen-serial.pgm ./out/imagen-cuda.pgm
+echo
+
+echo

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+
+imagen=luna1000
+
+for i in `seq 8 12`;
+do
+	echo "convert -resize "$i"x"$i" "$imagen".pgm cuad"$i".pgm"
+	convert -resize $ix$i $imagen.pgm cuad$i.pgm
+
+done
